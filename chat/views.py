@@ -125,3 +125,20 @@ class MessageUpdateView(APIView):
             serializer.errors,
             status=status.HTTP_400_BAD_REQUEST
         )
+    
+class MessageDeleteView(APIView):
+    def delete(self, request, message_id):
+        message = get_object_or_404(
+            Message,
+            id=message_id
+        )
+
+        if message.sender != request.user:
+            return Response(
+                {"error": "You can only delete your own messages."},
+                status=status.HTTP_403_FORBIDDEN
+            )
+
+        message.delete()
+
+        return Response(status=status.HTTP_204_NO_CONTENT)

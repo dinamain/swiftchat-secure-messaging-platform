@@ -4,7 +4,8 @@ from .views import (
     ConversationListView,
     MessageCreateView,
     MessageListView,
-    MessageUpdateView
+    MessageUpdateView,
+    MessageDeleteView
 )
 
 urlpatterns = [
@@ -20,5 +21,10 @@ urlpatterns = [
         "messages/<int:message_id>/",
         MessageUpdateView.as_view(),
         name="edit_message",
+    ),
+    path(
+    "messages/<int:message_id>/delete/",
+    MessageDeleteView.as_view(),
+    name="delete_message",
     ),
 ]
