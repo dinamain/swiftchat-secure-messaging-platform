@@ -10,6 +10,10 @@ from .serializers import (
 from django.shortcuts import get_object_or_404
 from .models import Conversation, ConversationMember, Message
 
+from django.db.models import Count
+from rest_framework.permissions import IsAuthenticated
+from .models import MessageReceipt
+from .serializers import UnreadCountSerializer
 
 class ConversationCreateView(APIView):
     def post(self, request):
@@ -142,3 +146,31 @@ class MessageDeleteView(APIView):
         message.delete()
 
         return Response(status=status.HTTP_204_NO_CONTENT)
+    
+
+
+
+class UnreadCountView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        unread_counts = (
+            MessageReceipt.objects.filter(
+                user=request.user,
+                seen=False
+            )
+            .values("message__conversation_id")
+            .annotate(unread_count=Count("id"))
+        )
+
+        formatted_data = [
+            {
+                "conversation_id": item["message__conversation_id"],
+                "unread_count": item["unread_count"],
+            }
+            for item in unread_counts
+        ]
+
+        serializer = UnreadCountSerializer(formatted_data, many=True)
+
+        return Response(serializer.data)

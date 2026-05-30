@@ -93,3 +93,7 @@ class MessageUpdateSerializer(serializers.ModelSerializer):
         instance.is_edited = True
         instance.save()
         return instance
+    
+class UnreadCountSerializer(serializers.Serializer):
+    conversation_id = serializers.IntegerField()
+    unread_count = serializers.IntegerField()

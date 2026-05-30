@@ -5,7 +5,8 @@ from .views import (
     MessageCreateView,
     MessageListView,
     MessageUpdateView,
-    MessageDeleteView
+    MessageDeleteView,
+    UnreadCountView,
 )
 
 urlpatterns = [
@@ -27,4 +28,5 @@ urlpatterns = [
     MessageDeleteView.as_view(),
     name="delete_message",
     ),
+    path("unread-counts/", UnreadCountView.as_view()),
 ]
