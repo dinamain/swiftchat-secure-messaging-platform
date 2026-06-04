@@ -184,9 +184,17 @@ class ChatConsumer(WebsocketConsumer):
         self.send(
             text_data=json.dumps(
                 {
+                    "type": "message",
+                    "message_type": event.get(
+                        "message_type",
+                        "text"
+                    ),
                     "id": event["message_id"],
                     "sender": event["sender"],
                     "content": event["content"],
+                    "attachment_url": event.get(
+                        "attachment_url"
+                    ),
                     "created_at": event["created_at"],
                 }
             )

@@ -27,6 +27,9 @@ from rest_framework.parsers import (
     FormParser
 )
 
+from channels.layers import get_channel_layer
+from asgiref.sync import async_to_sync
+
 User = get_user_model()
 class ConversationCreateView(APIView):
     def post(self, request):
@@ -68,7 +71,7 @@ class MessageCreateView(APIView):
         MultiPartParser,
         FormParser
     ]
-    
+
     def post(self, request):
         serializer = MessageSerializer(
             data=request.data,
@@ -78,16 +81,39 @@ class MessageCreateView(APIView):
         if serializer.is_valid():
             message = serializer.save()
 
-            response_serializer = MessageSerializer(message)
+            channel_layer = get_channel_layer()
 
-            return Response(
-                response_serializer.data,
-                status=status.HTTP_201_CREATED
-            )
+            async_to_sync(channel_layer.group_send)(
+                f"chat_{message.conversation.id}",
+                {
+                    "type": "chat_message",
+                    "message_id": message.id,
+                    "sender": request.user.email,
+                    "content": message.content,
+                    "attachment_url": (
+                        request.build_absolute_uri(
+                            message.attachment.url
+                        )
+                        if message.attachment
+                        else None
+                    ),
+                "message_type": (
+                    "file"
+                    if message.attachment
+                    else "text"
+                ),
+                "created_at": str(message.created_at),
+            }
+        )
+
+        response_serializer = MessageSerializer(
+            message,
+            context={"request": request}
+        )
 
         return Response(
-            serializer.errors,
-            status=status.HTTP_400_BAD_REQUEST
+            response_serializer.data,
+            status=status.HTTP_201_CREATED
         )
     
 class MessageListView(APIView):
