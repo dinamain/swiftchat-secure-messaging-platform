@@ -134,6 +134,34 @@ class MessageSerializer(serializers.ModelSerializer):
 
         return None
 
+    def validate_attachment(self, attachment):
+
+        allowed_extensions = [
+            ".jpg",
+            ".jpeg",
+            ".png",
+            ".pdf",
+            ".docx",
+        ]
+
+        MAX_FILE_SIZE = 10 * 1024 * 1024
+        filename = attachment.name.lower()
+
+        if not any(
+            filename.endswith(ext)
+            for ext in allowed_extensions
+        ):
+            raise serializers.ValidationError(
+                "Only JPG, PNG, PDF and DOCX files are allowed."
+            )
+
+        if attachment.size > MAX_FILE_SIZE:
+            raise serializers.ValidationError(
+            "Maximum file size is 10 MB."
+        )
+        return attachment
+    
+
     def validate(self, attrs):
         content = attrs.get("content")
         attachment = attrs.get("attachment")
