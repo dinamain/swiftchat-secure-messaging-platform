@@ -126,10 +126,13 @@ class ChatConsumer(WebsocketConsumer):
     def handle_delivered(self, data):
         message_id = data["message_id"]
 
-        receipt = MessageReceipt.objects.get(
+        receipt = MessageReceipt.objects.filter(
             message_id=message_id,
             user=self.user
-        )
+        ).first()
+
+        if not receipt:
+            return
 
         if not receipt.delivered:
             receipt.delivered = True
@@ -149,15 +152,23 @@ class ChatConsumer(WebsocketConsumer):
     def handle_seen(self, data):
         message_id = data["message_id"]
 
-        receipt = MessageReceipt.objects.get(
+        receipt = MessageReceipt.objects.filter(
             message_id=message_id,
             user=self.user
-        )
+        ).first()
+
+        if not receipt:
+            return
+
+        if not receipt.delivered:
+            receipt.delivered = True
+            receipt.delivered_at = timezone.now()
 
         if not receipt.seen:
             receipt.seen = True
             receipt.seen_at = timezone.now()
-            receipt.save()
+
+        receipt.save()
 
         async_to_sync(self.channel_layer.group_send)(
             self.room_group_name,

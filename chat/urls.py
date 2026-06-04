@@ -7,6 +7,14 @@ from .views import (
     MessageUpdateView,
     MessageDeleteView,
     UnreadCountView,
+    AddMemberView,
+    RemoveMemberView,
+    LeaveGroupView,
+    TransferOwnershipView,
+    DeleteGroupView,
+    RenameGroupView,
+    GroupDetailsView,
+    MessageSearchView,
 )
 
 urlpatterns = [
@@ -29,4 +37,55 @@ urlpatterns = [
     name="delete_message",
     ),
     path("unread-counts/", UnreadCountView.as_view()),
+
+    path(
+    "conversations/<int:conversation_id>/members/",
+    AddMemberView.as_view(),
+    name="add-member"
+),
+path(
+    "conversations/<int:conversation_id>/members/<int:user_id>/",
+    RemoveMemberView.as_view(),
+    name="remove-member",
+),
+path(
+    "conversations/<int:conversation_id>/leave/",
+    LeaveGroupView.as_view(),
+    name="leave-group",
+),
+path(
+    "conversations/<int:conversation_id>/transfer-ownership/",
+    TransferOwnershipView.as_view(),
+    name="transfer-ownership",
+),
+path(
+    "conversations/<int:conversation_id>/delete-group/",
+    DeleteGroupView.as_view(),
+    name="delete-group",
+),
+path(
+    "conversations/<int:conversation_id>/transfer-ownership/",
+    TransferOwnershipView.as_view(),
+    name="transfer-ownership",
+),
+path(
+    "conversations/<int:conversation_id>/delete-group/",
+    DeleteGroupView.as_view(),
+    name="delete-group",
+),
+path(
+    "conversations/<int:conversation_id>/rename/",
+    RenameGroupView.as_view(),
+    name="rename-group",
+),
+path(
+    "conversations/<int:conversation_id>/details/",
+    GroupDetailsView.as_view(),
+    name="group-details",
+),
+path(
+    "conversations/<int:conversation_id>/search/",
+    MessageSearchView.as_view(),
+    name="search-messages",
+),
 ]

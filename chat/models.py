@@ -31,6 +31,9 @@ class ConversationMember(models.Model):
         related_name="conversation_memberships",
     )
     joined_at = models.DateTimeField(auto_now_add=True)
+    
+    class Meta:
+        unique_together = ("conversation", "user")
 
     def __str__(self):
         return f"{self.user.username} in {self.conversation}"
@@ -47,7 +50,14 @@ class Message(models.Model):
         on_delete=models.CASCADE,
         related_name="sent_messages",
     )
-    content = models.TextField()
+    content = models.TextField(blank=True)
+    
+    attachment = models.FileField(
+        upload_to="chat_attachments/",
+        null=True,
+        blank=True
+    )
+
     is_edited = models.BooleanField(default=False)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)

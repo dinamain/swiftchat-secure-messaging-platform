@@ -6,15 +6,28 @@ from .serializers import (
     ConversationSerializer,
     MessageSerializer,
     MessageUpdateSerializer,
+    AddMemberSerializer,
+    TransferOwnershipSerializer,
+    RenameGroupSerializer,
+    GroupDetailsSerializer,
 )
 from django.shortcuts import get_object_or_404
 from .models import Conversation, ConversationMember, Message
 
-from django.db.models import Count
+from django.db.models import Count, Q
 from rest_framework.permissions import IsAuthenticated
 from .models import MessageReceipt
 from .serializers import UnreadCountSerializer
 
+from django.contrib.auth import get_user_model
+from .pagination import MessagePagination
+
+from rest_framework.parsers import (
+    MultiPartParser,
+    FormParser
+)
+
+User = get_user_model()
 class ConversationCreateView(APIView):
     def post(self, request):
         serializer = ConversationSerializer(
@@ -51,6 +64,11 @@ class ConversationListView(APIView):
         return Response(serializer.data)
     
 class MessageCreateView(APIView):
+    parser_classes = [
+        MultiPartParser,
+        FormParser
+    ]
+    
     def post(self, request):
         serializer = MessageSerializer(
             data=request.data,
@@ -90,14 +108,23 @@ class MessageListView(APIView):
                 status=status.HTTP_403_FORBIDDEN
             )
 
-        messages = conversation.messages.all().order_by("created_at")
+        messages = conversation.messages.all().order_by("-created_at")
+
+        paginator = MessagePagination()
+
+        page = paginator.paginate_queryset(
+            messages,
+            request
+        )
 
         serializer = MessageSerializer(
-            messages,
+            page,
             many=True
         )
 
-        return Response(serializer.data)
+        return paginator.get_paginated_response(
+            serializer.data
+        )
     
 class MessageUpdateView(APIView):
     def patch(self, request, message_id):
@@ -174,3 +201,409 @@ class UnreadCountView(APIView):
         serializer = UnreadCountSerializer(formatted_data, many=True)
 
         return Response(serializer.data)
+    
+
+class AddMemberView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, conversation_id):
+
+        conversation = get_object_or_404(
+            Conversation,
+            id=conversation_id
+        )
+
+        if not conversation.is_group:
+            return Response(
+                {
+                    "error": "This operation is only allowed for group conversations."
+                },
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        if conversation.created_by != request.user:
+            return Response(
+                {
+                    "error": "Only group creator can add members."
+                },
+                status=status.HTTP_403_FORBIDDEN
+            )
+
+        serializer = AddMemberSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        user_id = serializer.validated_data["user_id"]
+
+        user = get_object_or_404(
+            User,
+            id=user_id
+        )
+
+        membership_exists = ConversationMember.objects.filter(
+            conversation=conversation,
+            user=user
+        ).exists()
+
+        if membership_exists:
+            return Response(
+                {
+                    "error": "User is already a member."
+                },
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        ConversationMember.objects.create(
+            conversation=conversation,
+            user=user
+        )
+
+        return Response(
+            {
+                "message": f"{user.email} added successfully."
+            }
+        )
+    
+class RemoveMemberView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def delete(self, request, conversation_id, user_id):
+
+        conversation = get_object_or_404(
+            Conversation,
+            id=conversation_id
+        )
+
+        if not conversation.is_group:
+            return Response(
+                {
+                    "error": "This operation is only allowed for group conversations."
+                },
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        if conversation.created_by != request.user:
+            return Response(
+                {
+                    "error": "Only group creator can remove members."
+                },
+                status=status.HTTP_403_FORBIDDEN
+            )
+
+        membership = ConversationMember.objects.filter(
+            conversation=conversation,
+            user_id=user_id
+        ).first()
+
+        if not membership:
+            return Response(
+                {
+                    "error": "User is not a member."
+                },
+                status=status.HTTP_404_NOT_FOUND
+            )
+
+        if membership.user == conversation.created_by:
+            return Response(
+                {
+                    "error": "Creator cannot be removed."
+                },
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        membership.delete()
+
+        return Response(
+            {
+                "message": "Member removed successfully."
+            }
+        )
+    
+class LeaveGroupView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, conversation_id):
+
+        conversation = get_object_or_404(
+            Conversation,
+            id=conversation_id
+        )
+
+        if not conversation.is_group:
+            return Response(
+                {
+                    "error": "Direct conversations cannot be left."
+                },
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        if conversation.created_by == request.user:
+            return Response(
+                {
+                    "error": "Transfer ownership before leaving."
+                },
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        membership = ConversationMember.objects.filter(
+            conversation=conversation,
+            user=request.user
+        ).first()
+
+        if not membership:
+            return Response(
+                {
+                    "error": "You are not a member of this group."
+                },
+                status=status.HTTP_404_NOT_FOUND
+            )
+
+        membership.delete()
+
+        return Response(
+            {
+                "message": "You left the group successfully."
+            }
+        )
+
+    
+class DeleteGroupView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def delete(self, request, conversation_id):
+
+        conversation = get_object_or_404(
+            Conversation,
+            id=conversation_id
+        )
+
+        if not conversation.is_group:
+            return Response(
+                {
+                    "error": "Only group conversations can be deleted."
+                },
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        if conversation.created_by != request.user:
+            return Response(
+                {
+                    "error": "Only the creator can delete this group."
+                },
+                status=status.HTTP_403_FORBIDDEN
+            )
+
+        deleted_count, details = conversation.delete()
+
+        return Response(
+            {
+                "deleted_count": deleted_count,
+                "details": details,
+            }
+        )
+    
+class TransferOwnershipView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, conversation_id):
+
+        conversation = get_object_or_404(
+            Conversation,
+            id=conversation_id
+        )
+
+        if not conversation.is_group:
+            return Response(
+                {
+                    "error": "Only group conversations support ownership transfer."
+                },
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        if conversation.created_by != request.user:
+            return Response(
+                {
+                    "error": "Only the creator can transfer ownership."
+                },
+                status=status.HTTP_403_FORBIDDEN
+            )
+
+        serializer = TransferOwnershipSerializer(
+            data=request.data
+        )
+
+        serializer.is_valid(raise_exception=True)
+
+        new_owner_id = serializer.validated_data["new_owner_id"]
+
+        membership_exists = ConversationMember.objects.filter(
+            conversation=conversation,
+            user_id=new_owner_id
+        ).exists()
+
+        if not membership_exists:
+            return Response(
+                {
+                    "error": "New owner must be a member of the group."
+                },
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        conversation.created_by_id = new_owner_id
+        conversation.save()
+
+        return Response(
+            {
+                "message": "Ownership transferred successfully."
+            }
+        )
+    
+
+class RenameGroupView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def patch(self, request, conversation_id):
+
+        conversation = get_object_or_404(
+            Conversation,
+            id=conversation_id
+        )
+
+        if not conversation.is_group:
+            return Response(
+                {
+                    "error": "Only group conversations can be renamed."
+                },
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        if conversation.created_by != request.user:
+            return Response(
+                {
+                    "error": "Only the creator can rename the group."
+                },
+                status=status.HTTP_403_FORBIDDEN
+            )
+
+        serializer = RenameGroupSerializer(
+            data=request.data
+        )
+
+        serializer.is_valid(raise_exception=True)
+
+        conversation.name = serializer.validated_data["name"]
+        conversation.save()
+
+        return Response(
+            {
+                "message": "Group renamed successfully.",
+                "group_name": conversation.name
+            }
+        )
+    
+class GroupDetailsView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, conversation_id):
+
+        conversation = get_object_or_404(
+            Conversation,
+            id=conversation_id
+        )
+
+        is_member = ConversationMember.objects.filter(
+            conversation=conversation,
+            user=request.user
+        ).exists()
+
+        if not is_member:
+            return Response(
+                {
+                    "error": "You are not a member of this conversation."
+                },
+                status=status.HTTP_403_FORBIDDEN
+            )
+
+        members = ConversationMember.objects.filter(
+            conversation=conversation
+        )
+
+        data = {
+            "id": conversation.id,
+            "name": conversation.name,
+            "is_group": conversation.is_group,
+            "created_by": conversation.created_by.email,
+            "member_count": members.count(),
+            "members": [
+                {
+                    "id": member.user.id,
+                    "email": member.user.email,
+                }
+                for member in members
+            ]
+        }
+
+        serializer = GroupDetailsSerializer(data)
+
+        return Response(serializer.data)
+    
+
+class MessageSearchView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, conversation_id):
+
+        conversation = get_object_or_404(
+            Conversation,
+            id=conversation_id
+        )
+
+        is_member = ConversationMember.objects.filter(
+            conversation=conversation,
+            user=request.user
+        ).exists()
+
+        if not is_member:
+            return Response(
+                {
+                    "error": "You are not a member of this conversation."
+                },
+                status=status.HTTP_403_FORBIDDEN
+            )
+
+        query = request.GET.get("q")
+
+        if not query:
+            return Response(
+                {
+                    "error": "Search query is required."
+                },
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        messages = (
+            Message.objects.filter(
+                conversation=conversation
+            )
+            .filter(
+                Q(content__icontains=query)
+                |
+                Q(sender__email__icontains=query)
+            )
+            .order_by("-created_at")
+        )
+
+        paginator = MessagePagination()
+
+        page = paginator.paginate_queryset(
+            messages,
+            request
+        )
+
+        serializer = MessageSerializer(
+            page,
+            many=True
+        )
+
+        return paginator.get_paginated_response(
+            serializer.data
+        )
