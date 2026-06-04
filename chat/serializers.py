@@ -144,9 +144,18 @@ class MessageSerializer(serializers.ModelSerializer):
             ".docx",
         ]
 
-        MAX_FILE_SIZE = 10 * 1024 * 1024
+        allowed_content_types = [
+            "image/jpeg",
+            "image/png",
+            "application/pdf",
+            "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+        ]
+
+        MAX_FILE_SIZE = 10 * 1024 * 1024  # 10 MB
+
         filename = attachment.name.lower()
 
+        # Extension validation
         if not any(
             filename.endswith(ext)
             for ext in allowed_extensions
@@ -155,12 +164,20 @@ class MessageSerializer(serializers.ModelSerializer):
                 "Only JPG, PNG, PDF and DOCX files are allowed."
             )
 
+        # MIME validation
+        if attachment.content_type not in allowed_content_types:
+            raise serializers.ValidationError(
+                "Invalid file type."
+            )
+
+        # Size validation
         if attachment.size > MAX_FILE_SIZE:
             raise serializers.ValidationError(
-            "Maximum file size is 10 MB."
-        )
+                "Maximum file size is 10 MB."
+            )
+
         return attachment
-    
+        
 
     def validate(self, attrs):
         content = attrs.get("content")
