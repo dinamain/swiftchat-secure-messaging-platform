@@ -15,6 +15,7 @@ from .views import (
     RenameGroupView,
     GroupDetailsView,
     MessageSearchView,
+    MessageReactionView,
 )
 
 urlpatterns = [
@@ -87,5 +88,10 @@ path(
     "conversations/<int:conversation_id>/search/",
     MessageSearchView.as_view(),
     name="search-messages",
+),
+path(
+    "messages/<int:message_id>/react/",
+    MessageReactionView.as_view(),
+    name="react_to_message",
 ),
 ]

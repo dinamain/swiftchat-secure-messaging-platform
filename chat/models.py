@@ -51,7 +51,7 @@ class Message(models.Model):
         related_name="sent_messages",
     )
     content = models.TextField(blank=True)
-    
+
     attachment = models.FileField(
         upload_to="chat_attachments/",
         null=True,
@@ -89,3 +89,26 @@ class MessageReceipt(models.Model):
 
     def __str__(self):
         return f"{self.user.username} receipt for message {self.message.id}"
+    
+
+class MessageReaction(models.Model):
+    message = models.ForeignKey(
+        Message,
+        on_delete=models.CASCADE,
+        related_name="reactions"
+    )
+
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE
+    )
+
+    emoji = models.CharField(max_length=10)
+
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        unique_together = ("message", "user", "emoji")
+
+    def __str__(self):
+        return f"{self.user.email} reacted {self.emoji}"

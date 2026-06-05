@@ -1,5 +1,10 @@
 from rest_framework import serializers
-from .models import Conversation, ConversationMember, Message
+from .models import (
+    Conversation,
+    ConversationMember,
+    Message,
+    MessageReaction,
+)
 
 
 class ConversationSerializer(serializers.ModelSerializer):
@@ -251,3 +256,16 @@ class GroupDetailsSerializer(serializers.Serializer):
     created_by = serializers.CharField()
     member_count = serializers.IntegerField()
     members = GroupMemberSerializer(many=True)
+
+class MessageReactionSerializer(serializers.ModelSerializer):
+    user = serializers.StringRelatedField(read_only=True)
+
+    class Meta:
+        model = MessageReaction
+        fields = [
+            "id",
+            "message",
+            "user",
+            "emoji",
+            "created_at",
+        ]

@@ -246,3 +246,16 @@ class ChatConsumer(WebsocketConsumer):
                 }
             )
         )
+
+    def reaction_event(self, event):
+        self.send(
+            text_data=json.dumps(
+                {
+                    "type": "reaction",
+                    "message_id": event["message_id"],
+                    "user": event["user"],
+                    "emoji": event["emoji"],
+                    "action": event["action"],
+                }
+            )
+        )

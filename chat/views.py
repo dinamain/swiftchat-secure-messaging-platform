@@ -10,9 +10,10 @@ from .serializers import (
     TransferOwnershipSerializer,
     RenameGroupSerializer,
     GroupDetailsSerializer,
+    MessageReactionSerializer,
 )
 from django.shortcuts import get_object_or_404
-from .models import Conversation, ConversationMember, Message
+from .models import Conversation, ConversationMember, Message, MessageReaction
 
 from django.db.models import Count, Q
 from rest_framework.permissions import IsAuthenticated
@@ -632,4 +633,87 @@ class MessageSearchView(APIView):
 
         return paginator.get_paginated_response(
             serializer.data
+        )
+    
+class MessageReactionView(APIView):
+
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, message_id):
+
+        message = get_object_or_404(
+            Message,
+            id=message_id
+        )
+
+        emoji = request.data.get("emoji")
+
+        if not emoji:
+            return Response(
+                {
+                    "error": "Emoji is required."
+                },
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        channel_layer = get_channel_layer()
+
+        existing_reaction = MessageReaction.objects.filter(
+            message=message,
+            user=request.user,
+            emoji=emoji
+        ).first()
+
+        # REMOVE REACTION
+        if existing_reaction:
+
+            existing_reaction.delete()
+
+            async_to_sync(channel_layer.group_send)(
+                f"chat_{message.conversation.id}",
+                {
+                    "type": "reaction_event",
+                    "message_id": message.id,
+                    "user": request.user.email,
+                    "emoji": emoji,
+                    "action": "removed",
+                }
+            )
+
+            return Response(
+                {
+                    "action": "removed",
+                    "emoji": emoji,
+                    "message_id": message.id,
+                }
+            )
+
+        # ADD REACTION
+        reaction = MessageReaction.objects.create(
+            message=message,
+            user=request.user,
+            emoji=emoji
+        )
+
+        async_to_sync(channel_layer.group_send)(
+            f"chat_{message.conversation.id}",
+            {
+                "type": "reaction_event",
+                "message_id": message.id,
+                "user": request.user.email,
+                "emoji": emoji,
+                "action": "added",
+            }
+        )
+
+        serializer = MessageReactionSerializer(
+            reaction
+        )
+
+        return Response(
+            {
+                "action": "added",
+                "reaction": serializer.data,
+            },
+            status=status.HTTP_201_CREATED
         )
