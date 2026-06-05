@@ -5,7 +5,7 @@ from .models import (
     Message,
     MessageReaction,
 )
-
+from notifications.models import Notification
 
 class ConversationSerializer(serializers.ModelSerializer):
     member_ids = serializers.ListField(
@@ -247,12 +247,26 @@ class MessageSerializer(serializers.ModelSerializer):
                 id=reply_to_id
             ).first()
 
-        return Message.objects.create(
+        message = Message.objects.create(
             sender=user,
             reply_to=reply_to,
             **validated_data
         )
-    
+
+        # Reply notification
+        if (
+            reply_to
+            and reply_to.sender != user
+        ):
+            Notification.objects.create(
+                recipient=reply_to.sender,
+                actor=user,
+                notification_type="reply",
+                message=f"{user.email} replied to your message"
+            )
+
+        return message
+        
 class MessageUpdateSerializer(serializers.ModelSerializer):
     class Meta:
         model = Message

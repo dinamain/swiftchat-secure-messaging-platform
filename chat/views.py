@@ -27,7 +27,7 @@ from rest_framework.parsers import (
     MultiPartParser,
     FormParser
 )
-
+from notifications.models import Notification
 from channels.layers import get_channel_layer
 from asgiref.sync import async_to_sync
 
@@ -292,7 +292,15 @@ class AddMemberView(APIView):
             conversation=conversation,
             user=user
         )
-
+        Notification.objects.create(
+            recipient=user,
+            actor=request.user,
+            notification_type="group",
+            message=(
+                f"{request.user.email} added you "
+                f"to {conversation.name}"
+            )
+        )
         return Response(
             {
                 "message": f"{user.email} added successfully."
@@ -643,7 +651,7 @@ class MessageSearchView(APIView):
         return paginator.get_paginated_response(
             serializer.data
         )
-    
+
 class MessageReactionView(APIView):
 
     permission_classes = [IsAuthenticated]
@@ -697,13 +705,35 @@ class MessageReactionView(APIView):
                 }
             )
 
-        # ADD REACTION
+       # ADD REACTION
         reaction = MessageReaction.objects.create(
             message=message,
             user=request.user,
             emoji=emoji
         )
 
+        # Create notification
+        if message.sender != request.user:
+
+            notification = Notification.objects.create(
+                recipient=message.sender,
+                actor=request.user,
+                notification_type="reaction",
+                message=f"{request.user.email} reacted {emoji} to your message"
+            )
+
+            # Realtime notification
+            async_to_sync(channel_layer.group_send)(
+                f"notifications_{message.sender.id}",
+                {
+                    "type": "notification_event",
+                    "notification_type": notification.notification_type,
+                    "message": notification.message,
+                    "actor": request.user.email,
+                }
+            )
+
+        # Realtime reaction event
         async_to_sync(channel_layer.group_send)(
             f"chat_{message.conversation.id}",
             {
