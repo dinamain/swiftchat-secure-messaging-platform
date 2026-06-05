@@ -16,6 +16,8 @@ from .views import (
     GroupDetailsView,
     MessageSearchView,
     MessageReactionView,
+    PinMessageView,
+    PinnedMessagesView,
 )
 
 urlpatterns = [
@@ -93,5 +95,15 @@ path(
     "messages/<int:message_id>/react/",
     MessageReactionView.as_view(),
     name="react_to_message",
+),
+path(
+    "messages/<int:message_id>/pin/",
+    PinMessageView.as_view(),
+    name="pin_message",
+),
+path(
+    "conversations/<int:conversation_id>/pinned/",
+    PinnedMessagesView.as_view(),
+    name="pinned_messages",
 ),
 ]

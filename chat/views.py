@@ -98,6 +98,15 @@ class MessageCreateView(APIView):
                         if message.attachment
                         else None
                     ),
+                    "reply_to": (
+                    {
+                        "id": message.reply_to.id,
+                        "sender": message.reply_to.sender.email,
+                        "content": message.reply_to.content,
+                    }
+                    if message.reply_to
+                    else None
+                ),
                 "message_type": (
                     "file"
                     if message.attachment
@@ -717,3 +726,72 @@ class MessageReactionView(APIView):
             },
             status=status.HTTP_201_CREATED
         )
+    
+class PinMessageView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, message_id):
+
+        message = get_object_or_404(
+            Message,
+            id=message_id
+        )
+
+        membership_exists = ConversationMember.objects.filter(
+            conversation=message.conversation,
+            user=request.user
+        ).exists()
+
+        if not membership_exists:
+            return Response(
+                {
+                    "error": "You are not a member of this conversation."
+                },
+                status=status.HTTP_403_FORBIDDEN
+            )
+
+        message.is_pinned = not message.is_pinned
+        message.save()
+
+        return Response(
+            {
+                "message_id": message.id,
+                "is_pinned": message.is_pinned,
+            }
+        )
+    
+class PinnedMessagesView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, conversation_id):
+
+        conversation = get_object_or_404(
+            Conversation,
+            id=conversation_id
+        )
+
+        is_member = ConversationMember.objects.filter(
+            conversation=conversation,
+            user=request.user
+        ).exists()
+
+        if not is_member:
+            return Response(
+                {
+                    "error": "You are not a member of this conversation."
+                },
+                status=status.HTTP_403_FORBIDDEN
+            )
+
+        messages = Message.objects.filter(
+            conversation=conversation,
+            is_pinned=True
+        ).order_by("-created_at")
+
+        serializer = MessageSerializer(
+            messages,
+            many=True,
+            context={"request": request}
+        )
+
+        return Response(serializer.data)

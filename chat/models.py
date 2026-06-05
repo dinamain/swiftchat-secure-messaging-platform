@@ -57,7 +57,14 @@ class Message(models.Model):
         null=True,
         blank=True
     )
-
+    reply_to = models.ForeignKey(
+    "self",
+    on_delete=models.SET_NULL,
+    null=True,
+    blank=True,
+    related_name="replies"
+    )
+    is_pinned = models.BooleanField(default=False)
     is_edited = models.BooleanField(default=False)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)

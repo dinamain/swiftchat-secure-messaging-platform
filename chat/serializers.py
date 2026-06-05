@@ -109,10 +109,28 @@ class ConversationSerializer(serializers.ModelSerializer):
 
         return conversation
     
+class ReplyMessageSerializer(serializers.ModelSerializer):
+    sender = serializers.StringRelatedField()
+
+    class Meta:
+        model = Message
+        fields = [
+            "id",
+            "sender",
+            "content",
+        ]
+
 class MessageSerializer(serializers.ModelSerializer):
     sender = serializers.StringRelatedField(read_only=True)
     attachment_url = serializers.SerializerMethodField()
-
+    reply_to = ReplyMessageSerializer(
+    read_only=True
+)
+    reply_to_id = serializers.IntegerField(
+    write_only=True,
+    required=False,
+    allow_null=True
+)
     class Meta:
         model = Message
         fields = [
@@ -122,6 +140,9 @@ class MessageSerializer(serializers.ModelSerializer):
             "content",
             "attachment",
             "attachment_url",
+            "reply_to",
+            "reply_to_id",
+            "is_pinned",
             "is_edited",
             "created_at",
         ]
@@ -211,10 +232,24 @@ class MessageSerializer(serializers.ModelSerializer):
         return conversation
 
     def create(self, validated_data):
+
         user = self.context["request"].user
+
+        reply_to_id = validated_data.pop(
+            "reply_to_id",
+            None
+        )
+
+        reply_to = None
+
+        if reply_to_id:
+            reply_to = Message.objects.filter(
+                id=reply_to_id
+            ).first()
 
         return Message.objects.create(
             sender=user,
+            reply_to=reply_to,
             **validated_data
         )
     
