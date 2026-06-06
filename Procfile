@@ -1,1 +1,1 @@
-web: daphne swiftchat.asgi:application --bind 0.0.0.0 --port $PORT
+web: daphne -b 0.0.0.0 -p $PORT swiftchat.asgi:application
