@@ -80,26 +80,31 @@ class MessageCreateView(APIView):
             context={"request": request}
         )
 
-        if serializer.is_valid():
-            message = serializer.save()
+        if not serializer.is_valid():
+            return Response(
+                serializer.errors,
+                status=status.HTTP_400_BAD_REQUEST
+            )
 
-            channel_layer = get_channel_layer()
+        message = serializer.save()
 
-            async_to_sync(channel_layer.group_send)(
-                f"chat_{message.conversation.id}",
-                {
-                    "type": "chat_message",
-                    "message_id": message.id,
-                    "sender": request.user.email,
-                    "content": message.content,
-                    "attachment_url": (
-                        request.build_absolute_uri(
-                            message.attachment.url
-                        )
-                        if message.attachment
-                        else None
-                    ),
-                    "reply_to": (
+        channel_layer = get_channel_layer()
+
+        async_to_sync(channel_layer.group_send)(
+            f"chat_{message.conversation.id}",
+            {
+                "type": "chat_message",
+                "message_id": message.id,
+                "sender": request.user.email,
+                "content": message.content,
+                "attachment_url": (
+                    request.build_absolute_uri(
+                        message.attachment.url
+                    )
+                    if message.attachment
+                    else None
+                ),
+                "reply_to": (
                     {
                         "id": message.reply_to.id,
                         "sender": message.reply_to.sender.email,
