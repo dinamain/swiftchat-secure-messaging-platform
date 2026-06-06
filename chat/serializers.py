@@ -6,7 +6,14 @@ from .models import (
     MessageReaction,
 )
 from notifications.models import Notification
+import re
 
+from django.contrib.auth import get_user_model
+from notifications.models import Notification
+from channels.layers import get_channel_layer
+from asgiref.sync import async_to_sync
+
+User = get_user_model()
 class ConversationSerializer(serializers.ModelSerializer):
     member_ids = serializers.ListField(
         child=serializers.IntegerField(),
@@ -119,11 +126,24 @@ class ReplyMessageSerializer(serializers.ModelSerializer):
             "sender",
             "content",
         ]
+class ForwardedMessageSerializer(serializers.ModelSerializer):
+    sender = serializers.StringRelatedField()
 
+    class Meta:
+        model = Message
+        fields = [
+            "id",
+            "sender",
+            "content",
+        ]
+        
 class MessageSerializer(serializers.ModelSerializer):
     sender = serializers.StringRelatedField(read_only=True)
     attachment_url = serializers.SerializerMethodField()
     reply_to = ReplyMessageSerializer(
+    read_only=True
+)
+    forwarded_from = ForwardedMessageSerializer(
     read_only=True
 )
     reply_to_id = serializers.IntegerField(
@@ -142,6 +162,7 @@ class MessageSerializer(serializers.ModelSerializer):
             "attachment_url",
             "reply_to",
             "reply_to_id",
+            "forwarded_from",
             "is_pinned",
             "is_edited",
             "created_at",
@@ -252,7 +273,51 @@ class MessageSerializer(serializers.ModelSerializer):
             reply_to=reply_to,
             **validated_data
         )
+        mentions = re.findall(
+            r"@([A-Za-z0-9._-]+)",
+            message.content or ""
+        )
 
+        for username in mentions:
+
+            mentioned_user = User.objects.filter(
+                email__startswith=username
+            ).first()
+
+            if not mentioned_user:
+                continue
+
+            # Don't notify yourself
+            if mentioned_user == message.sender:
+                continue
+
+            # User must belong to the conversation
+            membership_exists = ConversationMember.objects.filter(
+                conversation=message.conversation,
+                user=mentioned_user
+            ).exists()
+
+            if not membership_exists:
+                continue
+
+            notification = Notification.objects.create(
+                recipient=mentioned_user,
+                actor=message.sender,
+                notification_type="mention",
+                message=f"{message.sender.email} mentioned you"
+            )
+
+            channel_layer = get_channel_layer()
+
+            async_to_sync(channel_layer.group_send)(
+                f"notifications_{mentioned_user.id}",
+                {
+                    "type": "notification_event",
+                    "notification_type": "mention",
+                    "message": notification.message,
+                    "actor": message.sender.email,
+                }
+            )
         # Reply notification
         if (
             reply_to
@@ -318,3 +383,4 @@ class MessageReactionSerializer(serializers.ModelSerializer):
             "emoji",
             "created_at",
         ]
+

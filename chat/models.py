@@ -64,6 +64,13 @@ class Message(models.Model):
     blank=True,
     related_name="replies"
     )
+    forwarded_from = models.ForeignKey(
+    "self",
+    on_delete=models.SET_NULL,
+    null=True,
+    blank=True,
+    related_name="forwards"
+    )
     is_pinned = models.BooleanField(default=False)
     is_edited = models.BooleanField(default=False)
     created_at = models.DateTimeField(auto_now_add=True)

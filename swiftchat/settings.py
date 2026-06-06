@@ -53,6 +53,7 @@ INSTALLED_APPS = [
     "notifications",
     "rest_framework_simplejwt.token_blacklist",
     "channels",
+    "drf_spectacular",
     
 
 ]
@@ -147,6 +148,9 @@ REST_FRAMEWORK = {
     "DEFAULT_PERMISSION_CLASSES": (
         "rest_framework.permissions.IsAuthenticated",
     ),
+    "DEFAULT_SCHEMA_CLASS": (
+        "drf_spectacular.openapi.AutoSchema"
+    ),
 }
 
 CORS_ALLOWED_ORIGINS = [
@@ -168,3 +172,10 @@ CHANNEL_LAYERS = {
 
 MEDIA_URL = "/media/"
 MEDIA_ROOT = BASE_DIR / "media"
+
+
+SPECTACULAR_SETTINGS = {
+    "TITLE": "SwiftChat API",
+    "DESCRIPTION": "Realtime Chat Application Backend",
+    "VERSION": "1.0.0",
+}

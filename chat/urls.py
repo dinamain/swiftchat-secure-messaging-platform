@@ -18,6 +18,7 @@ from .views import (
     MessageReactionView,
     PinMessageView,
     PinnedMessagesView,
+    ForwardMessageView,
 )
 
 urlpatterns = [
@@ -105,5 +106,10 @@ path(
     "conversations/<int:conversation_id>/pinned/",
     PinnedMessagesView.as_view(),
     name="pinned_messages",
+),
+path(
+    "messages/<int:message_id>/forward/",
+    ForwardMessageView.as_view(),
+    name="forward_message",
 ),
 ]

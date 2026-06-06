@@ -195,6 +195,9 @@ class ChatConsumer(WebsocketConsumer):
                     "attachment_url": event.get(
                         "attachment_url"
                     ),
+                    "forwarded_from": event.get(
+    "forwarded_from"
+),
                     "reply_to": event.get("reply_to"),
                     "created_at": event["created_at"],
                 }

@@ -32,6 +32,7 @@ from channels.layers import get_channel_layer
 from asgiref.sync import async_to_sync
 
 User = get_user_model()
+
 class ConversationCreateView(APIView):
     def post(self, request):
         serializer = ConversationSerializer(
@@ -825,3 +826,88 @@ class PinnedMessagesView(APIView):
         )
 
         return Response(serializer.data)
+    
+class ForwardMessageView(APIView):
+
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, message_id):
+
+        original_message = get_object_or_404(
+            Message,
+            id=message_id
+        )
+
+        target_conversation_id = request.data.get(
+            "conversation_id"
+        )
+
+        conversation = get_object_or_404(
+            Conversation,
+            id=target_conversation_id
+        )
+
+
+        membership_exists = ConversationMember.objects.filter(
+            conversation=conversation,
+            user=request.user
+        ).exists()
+
+        if not membership_exists:
+            return Response(
+                {
+                    "error": "You are not a member of this conversation."
+                },
+                status=status.HTTP_403_FORBIDDEN
+            )
+
+        forwarded_message = Message.objects.create(
+            conversation=conversation,
+            sender=request.user,
+            content=original_message.content,
+            attachment=original_message.attachment,
+            forwarded_from=original_message,
+        )
+        channel_layer = get_channel_layer()
+
+        async_to_sync(channel_layer.group_send)(
+            f"chat_{conversation.id}",
+            {
+                "type": "chat_message",
+                "message_id": forwarded_message.id,
+                "sender": request.user.email,
+                "content": forwarded_message.content,
+                "attachment_url": (
+                    request.build_absolute_uri(
+                        forwarded_message.attachment.url
+                    )
+                    if forwarded_message.attachment
+                    else None
+                ),
+                "message_type": (
+                    "file"
+                    if forwarded_message.attachment
+                    else "text"
+                ),
+                "forwarded_from": (
+                    {
+                        "id": original_message.id,
+                        "sender": original_message.sender.email,
+                        "content": original_message.content,
+                    }
+                ),
+                "created_at": str(
+                    forwarded_message.created_at
+                ),
+            }
+        )
+
+        serializer = MessageSerializer(
+            forwarded_message,
+            context={"request": request}
+        )
+
+        return Response(
+            serializer.data,
+            status=status.HTTP_201_CREATED
+        )

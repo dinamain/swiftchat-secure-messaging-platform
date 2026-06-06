@@ -10,6 +10,7 @@ class Notification(models.Model):
         ("mention", "Mention"),
         ("group", "Group"),
         ("pin", "Pin"),
+        ("mention", "Mention"),
     ]
 
     recipient = models.ForeignKey(
