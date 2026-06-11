@@ -43,7 +43,8 @@ class ConversationCreateView(APIView):
         if serializer.is_valid():
             conversation = serializer.save()
 
-            response_serializer = ConversationSerializer(conversation)
+            response_serializer = ConversationSerializer(conversation,
+                                                         context={"request": request})
 
             return Response(
                 response_serializer.data,
@@ -63,7 +64,8 @@ class ConversationListView(APIView):
 
         serializer = ConversationSerializer(
             conversations,
-            many=True
+            many=True,
+            context={"request": request} 
         )
 
         return Response(serializer.data)
