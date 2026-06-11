@@ -30,9 +30,9 @@ from rest_framework.parsers import (
 from notifications.models import Notification
 from channels.layers import get_channel_layer
 from asgiref.sync import async_to_sync
-
+from drf_spectacular.utils import extend_schema
 User = get_user_model()
-
+@extend_schema(request=ConversationSerializer)
 class ConversationCreateView(APIView):
     def post(self, request):
         serializer = ConversationSerializer(
@@ -67,7 +67,7 @@ class ConversationListView(APIView):
         )
 
         return Response(serializer.data)
-    
+@extend_schema(request=MessageSerializer)  
 class MessageCreateView(APIView):
     parser_classes = [
         MultiPartParser,

@@ -22,7 +22,7 @@ class ConversationSerializer(serializers.ModelSerializer):
     )
 
     created_by = serializers.StringRelatedField(read_only=True)
-
+    other_user = serializers.SerializerMethodField()
     class Meta:
         model = Conversation
         fields = [
@@ -31,10 +31,28 @@ class ConversationSerializer(serializers.ModelSerializer):
             "is_group",
             "member_ids",
             "created_by",
+            "other_user",
             "created_at",
             "updated_at",
         ]
-
+    def get_other_user(self, obj):
+        if obj.is_group:
+            return None
+        request = self.context.get("request")
+        if not request:
+            return None
+        other = obj.memberships.exclude(
+            user=request.user
+        ).first()
+        if other:
+            return {
+                "id": other.user.id,
+                "email": other.user.email,
+                "username": other.user.username,
+            }
+        return None
+    
+    
     def validate(self, attrs):
         member_ids = attrs.get("member_ids", [])
         is_group = attrs.get("is_group", False)
