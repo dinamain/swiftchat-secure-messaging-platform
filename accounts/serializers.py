@@ -25,15 +25,15 @@ class ProfileSerializer(serializers.ModelSerializer):
     class Meta:
         model = User
         fields = [
-            "id",
-            "email",
-            "username",
-            "bio",
-            "avatar",
-            "is_online",
-            "last_seen",
-            "created_at",
-        ]
+    "id",
+    "email",
+    "username",
+    "bio",
+    "avatar",
+    "is_online",
+    "last_seen",
+    "updated_at",
+]
 
 
 class LogoutSerializer(serializers.Serializer):

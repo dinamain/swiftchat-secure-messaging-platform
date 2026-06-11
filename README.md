@@ -407,6 +407,14 @@ on every push and pull request.
 
 ---
 
+## Live Demo
+
+Backend URL:
+https://swiftchat-secure-messaging-platform.onrender.com
+
+Swagger:
+https://swiftchat-secure-messaging-platform.onrender.com/api/swagger/
+
 # Future Improvements
 
 Version 2:
