@@ -81,11 +81,15 @@ class ChatConsumer(WebsocketConsumer):
 
     def handle_message(self, data):
         content = data["message"]
-
+        reply_to_id = data.get("reply_to_id")
+        reply_to = None
+        if reply_to_id:
+            reply_to = Message.objects.filter(id=reply_to_id).first()
         message = Message.objects.create(
             conversation_id=self.conversation_id,
             sender=self.user,
-            content=content
+            content=content,
+            reply_to=reply_to,
         )
         recipients = ConversationMember.objects.exclude(
             user=self.user
@@ -108,7 +112,17 @@ class ChatConsumer(WebsocketConsumer):
                 "sender": self.user.username,
                 "content": message.content,
                 "created_at": str(message.created_at),
-            }
+                "reply_to": (
+                {
+                    "id": reply_to.id,
+                    "sender": reply_to.sender.username,
+                    "content": reply_to.content,
+                }
+                if reply_to
+                else None
+            ),
+            "created_at": str(message.created_at),
+        }
     )
         
     def handle_typing(self, data):
