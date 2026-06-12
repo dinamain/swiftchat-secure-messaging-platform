@@ -102,6 +102,21 @@ class ConversationSerializer(serializers.ModelSerializer):
     def create(self, validated_data):
         member_ids = validated_data.pop("member_ids", [])
         user = self.context["request"].user
+        is_group = validated_data.get("is_group", False)
+
+        # Check for existing direct conversation
+        if not is_group and member_ids:
+            other_user_id = member_ids[0]
+
+            existing = Conversation.objects.filter(
+                is_group=False,
+                memberships__user=user
+            ).filter(
+                memberships__user_id=other_user_id
+            ).distinct().first()
+
+            if existing:
+                return existing
 
         conversation = Conversation.objects.create(
             created_by=user,
@@ -116,8 +131,6 @@ class ConversationSerializer(serializers.ModelSerializer):
 
         # Add other members
         for member_id in member_ids:
-
-            # Skip creator if included accidentally
             if member_id == user.id:
                 continue
 
