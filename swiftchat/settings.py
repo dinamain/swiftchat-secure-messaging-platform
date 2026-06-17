@@ -63,6 +63,8 @@ INSTALLED_APPS = [
     "rest_framework_simplejwt.token_blacklist",
     "channels",
     "drf_spectacular",
+    "cloudinary_storage",
+    "cloudinary",
     
 
 ]
@@ -195,14 +197,25 @@ SPECTACULAR_SETTINGS = {
     "VERSION": "1.0.0",
 }
 
+
+SECURE_PROXY_SSL_HEADER = (
+    "HTTP_X_FORWARDED_PROTO",
+    "https",
+)
+
+CLOUDINARY_STORAGE = {
+    "CLOUD_NAME": os.getenv("CLOUDINARY_CLOUD_NAME"),
+    "API_KEY": os.getenv("CLOUDINARY_API_KEY"),
+    "API_SECRET": os.getenv("CLOUDINARY_API_SECRET"),
+}
+
 STORAGES = {
+    "default": {
+        "BACKEND": "cloudinary_storage.storage.MediaCloudinaryStorage",
+    },
     "staticfiles": {
         "BACKEND": (
             "whitenoise.storage.CompressedManifestStaticFilesStorage"
         ),
     },
 }
-SECURE_PROXY_SSL_HEADER = (
-    "HTTP_X_FORWARDED_PROTO",
-    "https",
-)
