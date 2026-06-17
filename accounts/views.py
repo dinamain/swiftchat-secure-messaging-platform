@@ -11,6 +11,7 @@ from .serializers import (
     LogoutSerializer,
     CustomLoginSerializer,
 )
+from rest_framework.parsers import MultiPartParser, FormParser
 from django.contrib.auth import get_user_model
 User = get_user_model()
 @extend_schema(request=RegisterSerializer)
@@ -45,7 +46,28 @@ class LogoutView(APIView):
                 status=status.HTTP_200_OK,
             )
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+class ProfileView(APIView):
+    parser_classes = [MultiPartParser, FormParser]
 
+    def get(self, request):
+        serializer = ProfileSerializer(request.user)
+        return Response(serializer.data)
+
+    def patch(self, request):
+        serializer = ProfileSerializer(
+            request.user,
+            data=request.data,
+            partial=True
+        )
+
+        if serializer.is_valid():
+            serializer.save()
+            return Response(serializer.data)
+
+        return Response(
+            serializer.errors,
+            status=status.HTTP_400_BAD_REQUEST
+        )
 
 @extend_schema(request=CustomLoginSerializer)
 class CustomLoginView(APIView):
