@@ -82,15 +82,18 @@ class ChatConsumer(WebsocketConsumer):
     def handle_message(self, data):
         content = data["message"]
         reply_to_id = data.get("reply_to_id")
+
         reply_to = None
         if reply_to_id:
             reply_to = Message.objects.filter(id=reply_to_id).first()
+
         message = Message.objects.create(
             conversation_id=self.conversation_id,
             sender=self.user,
             content=content,
             reply_to=reply_to,
         )
+
         recipients = ConversationMember.objects.exclude(
             user=self.user
         ).filter(
@@ -103,6 +106,26 @@ class ChatConsumer(WebsocketConsumer):
                 user=recipient.user
             )
 
+        # Create reply notification
+        if reply_to and reply_to.sender != self.user:
+            from notifications.models import Notification
+
+            notification = Notification.objects.create(
+                recipient=reply_to.sender,
+                actor=self.user,
+                notification_type="reply",
+                message=f"{self.user.username} replied to your message"
+            )
+
+            async_to_sync(self.channel_layer.group_send)(
+                f"notifications_{reply_to.sender.id}",
+                {
+                    "type": "notification_event",
+                    "notification_type": "reply",
+                    "message": notification.message,
+                    "actor": self.user.username,
+                }
+            )
 
         async_to_sync(self.channel_layer.group_send)(
             self.room_group_name,
@@ -111,19 +134,18 @@ class ChatConsumer(WebsocketConsumer):
                 "message_id": message.id,
                 "sender": self.user.username,
                 "content": message.content,
-                "created_at": str(message.created_at),
                 "reply_to": (
-                {
-                    "id": reply_to.id,
-                    "sender": reply_to.sender.username,
-                    "content": reply_to.content,
-                }
-                if reply_to
-                else None
-            ),
-            "created_at": str(message.created_at),
-        }
-    )
+                    {
+                        "id": reply_to.id,
+                        "sender": reply_to.sender.username,
+                        "content": reply_to.content,
+                    }
+                    if reply_to
+                    else None
+                ),
+                "created_at": str(message.created_at),
+            }
+        )
         
     def handle_typing(self, data):
         is_typing = data["is_typing"]
