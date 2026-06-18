@@ -1,6 +1,6 @@
 from django.db import models
 from django.conf import settings
-
+from .storage import AttachmentStorage
 
 class Conversation(models.Model):
     name = models.CharField(max_length=255, blank=True, null=True)
@@ -53,10 +53,11 @@ class Message(models.Model):
     content = models.TextField(blank=True)
 
     attachment = models.FileField(
-        upload_to="chat_attachments/",
-        null=True,
-        blank=True
-    )
+    upload_to="chat_attachments/",
+    storage=AttachmentStorage(),
+    null=True,
+    blank=True
+)
     reply_to = models.ForeignKey(
     "self",
     on_delete=models.SET_NULL,
